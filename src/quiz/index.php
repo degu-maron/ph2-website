@@ -1,3 +1,39 @@
+<?php
+/* ドライバ呼び出しを使用して MySQL データベースに接続する compose.yamlを参照*/
+$dsn = 'mysql:dbname=posse;host=db';
+$user = 'root';
+$password = 'root';
+
+$dbh = new PDO($dsn, $user, $password);
+// echo 'DB接続成功</br>';
+
+/* qustionsテーブル検索 */
+$sql_questions = "SELECT * FROM questions";
+$questions = $dbh->query($sql_questions)->fetchAll(PDO::FETCH_ASSOC);
+// var_dump($questions);
+// print('</br>');
+
+/* choicesテーブル検索 */
+$sql_choices = "SELECT id, question_id, name, valid FROM choices";
+$choices = $dbh->query($sql_choices)->fetchAll(PDO::FETCH_ASSOC);
+// var_dump($choices);
+// print('</br>');
+
+// print('</br>');
+
+/* データ整形 */
+//choicesをレコード数分ループ回す。レコード：配列の一行
+foreach ($choices as $key =>$choice) {
+  // choice変数のquestion_idをキーに、対応するquestion変数を検索。$indexにインデックス番号を代入する
+  $index = array_search($choice["question_id"], array_column($questions, 'id'));
+  // 検索されたquestion変数にchoice変数の内容を追加する。["choices"]の意味は？？？
+  $questions[$index]["choices"][] = $choice;
+}
+
+// var_dump($questions);
+
+?>
+
 <!DOCTYPE html>
 <html lang="ja">
 
@@ -5,9 +41,9 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>POSSE 初めてのWeb制作</title>
+  <title>ITクイズ | POSSE 初めてのWeb制作</title>
   <!-- スタイルシート読み込み -->
-  <link rel="stylesheet" href="./assets/styles/common.css">
+  <link rel="stylesheet" href="../assets/styles/common.css">
   <!-- Google Fonts読み込み -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,20 +51,21 @@
     href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Plus+Jakarta+Sans:wght@400;700&display=swap"
     rel="stylesheet">
   <script src="../assets/scripts/common.js" defer></script>
+  <script src="../assets/scripts/quiz.js" defer></script>
 </head>
 
 <body>
-<header id="js-header" class="l-header p-header">
-    <div class="p-header__logo"><img src="./assets/img/logo.svg" alt="POSSE"></div>
+  <header id="js-header" class="l-header p-header">
+    <div class="p-header__logo"><img src="../assets/img/logo.svg" alt="POSSE"></div>
     <button class="p-header__button" id="js-headerButton"></button>
     <div class="p-header__inner">
       <nav class="p-header__nav">
         <ul class="p-header__nav__list">
           <li class="p-header__nav__item">
-            <a href="./" class="p-header__nav__item__link">POSSEとは</a>
+            <a href="../" class="p-header__nav__item__link">POSSEとは</a>
           </li>
           <li class="p-header__nav__item">
-            <a href="./quiz/index.php" class="p-header__nav__item__link">クイズ</a>
+            <a href="./" class="p-header__nav__item__link">クイズ</a>
           </li>
         </ul>
       </nav>
@@ -58,41 +95,62 @@
   </header>
   <!-- /.l-header .p-header -->
 
+
   <main class="l-main">
-    <section class="p-top-hero">
-      <div class="p-top-hero__inner">
-        <div class="p-top-hero__body">
-          <h1 class="p-top-hero__body__title">学生プログラミングコミュニティ POSSE（ポッセ）</h1>
-          <span class="p-top-hero__body__catchcopy">自分史上最高<br>を仲間と。</span>
-        </div>
-        <picture class="p-top-hero__image">
-          <img src="./assets/img/img-hero.jpg" alt="">
-        </picture>
-        <div class="p-top-hero__scroll">Scroll Down</div>
+    <section class="p-hero p-quiz-hero">
+      <div class="l-container">
+        <h1 class="p-hero__title">
+          <span class="p-hero__title__label">POSSE課題</span>
+          <span class="p-hero__title__inline">ITクイズ</span>
+        </h1>
       </div>
     </section>
-    <!-- /.p-top-hero -->
+    <!-- /.p-hero .p-quiz-hero -->
 
-    <div class="p-top-container">
-      <section class="l-section p-top-about">
-        <div class="l-container">
-          <h2 class="p-heading">
-            POSSEとは<span class="p-heading__caption" lang="en" aria-hidden="true">About POSSE</span>
-          </h2>
-          <div class="p-top-about__body">
-            <picture class="p-top-about__image">
-              <img src="./assets/img/img-about.jpg" alt="POSSEメンバー集合写真">
-            </picture>
-            <div class="p-top-about__content">
-              <p>
-                学生プログラミングコミュニティ「POSSE(ポッセ)」は、人格とプログラミング、二つの面での成長をスローガンに活動しており、大学生だけが集まって学びを深めるコミュニティです。<br>プログラミングだけではありません。オフラインでのイベントや、旅行など様々な企画を行っています！<br>それらを通じて、夏休みの大半をPOSSEで出来た仲間と過ごす人もたくさんいるほどメンバーとの仲が深まります。
-              </p>
-            </div>
+    <!-- js使うならこのidつける -->
+    <!-- <div class="p-quiz-container l-container" id="js-quizContainer"></div> -->
+
+    <div class="p-quiz-container l-container">
+      <?php for ($i = 0; $i < count($questions); $i++) { ?>
+        <section class="p-quiz-box js-quiz" data-quiz="<?= $i ?>">
+          <div class="p-quiz-box__question">
+            <h2 class="p-quiz-box__question__title">
+              <span class="p-quiz-box__label">Q<?= $i + 1 ?></span>
+              <span class="p-quiz-box__question__title__text"><?= $questions[$i]["content"]; ?></span>
+            </h2>
+            <figure class="p-quiz-box__question__image">
+              <img src="../assets/img/quiz/<?= $questions[$i]["image"]; ?>" alt="Q<?= $i + 1 ?>イメージ">
+            </figure>
           </div>
-        </div>
-      </section>
-      <!-- /.l-section p-top-about -->
+          <div class="p-quiz-box__answer">
+            <span class="p-quiz-box__label p-quiz-box__label--accent">A</span>
+            <ul class="p-quiz-box__answer__list">
+              <?php for ($j = 0; $j <= 2; $j++) { ?>
+                <li class="p-quiz-box__answer__item">
+                  <button class="p-quiz-box__answer__button js-answer" data-answer="<?= $j ?>" data-correct="<?= $choices[$j]["valid"] ?>">
+                    <?= $choices[$j]["name"] ?><i class="u-icon__arrow"></i>
+                  </button>
+                </li>
+              <?php } ?>
+            </ul>
+          </div>
+          <div class="p-quiz-box__answer__correct js-answerBox">
+            <p class="p-quiz-box__answer__correct__title js-answerTitle"></p>
+            <p class="p-quiz-box__answer__correct__content">
+              <span class="p-quiz-box__answer__correct__content__label">A</span>
+              <span class="js-answerText"></span>
+            </p>
+          </div>
+          <?php if($questions[$i]["supplement"]) { ?>
+            <cite class="p-quiz-box__note">
+              <i class="u-icon__note"></i><?= $questions[$i]["supplement"] ?>
+            </cite>
+          <?php } ?>
+        </section>
+      <?php } ?>
+      <!-- ./p-quiz-box -->
     </div>
+    <!-- /.l-container .p-quiz-container -->
   </main>
 
   <div class="p-line">
@@ -111,6 +169,7 @@
       </div>
     </div>
   </div>
+  <!-- /.p-line -->
 
   <footer class="l-footer p-footer">
     <div class="p-fixedLine">
@@ -151,7 +210,7 @@
     </div>
   </footer>
   <!-- /.l-footer .p-footer -->
-  
+
 </body>
 
 </html>

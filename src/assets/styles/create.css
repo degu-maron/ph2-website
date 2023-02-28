@@ -1,0 +1,12 @@
+.form {
+  padding: 30px;
+}
+
+form div {
+  font-size: 15px;
+  margin-bottom: 5px;
+}
+
+input[type="text"] {
+  border: 1px solid #ccc;
+}
