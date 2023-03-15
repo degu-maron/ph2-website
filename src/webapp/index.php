@@ -324,13 +324,13 @@ file_put_contents("hours.json", $j_hours_data);
       <div class="main_bottom_arrow arrow_right"></div>
     </div>
   </main>
-  <div class="test">
+  <!-- <div class="test">
     <?PHP
     echo '<pre>';
     var_dump($formatted_hours_data);
     var_dump($formatted_days_data);
     ?>
-  </div>
+  </div> -->
 
 
 
