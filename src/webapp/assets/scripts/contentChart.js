@@ -1,35 +1,34 @@
 'use strict'
 {
   (async function () {
-    const url1 = '/webapp/languages.json';
-    const url2 = '/webapp/langhours.json';
+    const url1 = '/webapp/contents.json';
+    const url2 = '/webapp/conhours.json';
 
-    async function languageChart() {
+    async function contentChart() {
       const response1 = await fetch(url1);
-      const languages = await response1.json();
+      const contents = await response1.json();
       const response2 = await fetch(url2);
-      const langhours = await response2.json();
+      const conhours = await response2.json();
 
       let type = 'doughnut';
-      const ctx = document.getElementById('languageChart').getContext('2d');
+      const ctx = document.getElementById('studyChart').getContext('2d');
 
       const data = {
-        // labels: ['HTML', 'CSS', 'JavaScript', 'PHP', 'Laravel', 'SQL', 'SHELL', '情報システム基礎知識(その他)'],
-        labels: languages,
+        // labels: ["N予備校", "ドットインストール", "課題"],
+        labels: contents,
         datasets: [{
-          // data: [30, 20, 10, 5, 5, 20, 20, 10],
-          data: langhours,
-          backgroundColor: ['LightSkyBlue', 'SkyBlue', 'CornflowerBlue', 'RoyalBlue', 'Blue', 'MediumBlue', 'SlateBlue', 'BlueViolet'],
+          // data: [40, 20, 40],
+          data: conhours,
+          backgroundColor: ['LightSkyBlue', 'CornflowerBlue', 'RoyalBlue'],
           borderWidth: 0,
         }],
-
       };
-
+      
       const options = {
         plugins: {
           title: {
             display: true,
-            text: '学習言語',
+            text: '学習コンテンツ',
             align: 'start',
             font: {
               size: 15,
@@ -43,6 +42,10 @@
               size: 13,
             },
             formatter: function (value) {
+              let data_sum = 0;
+              data.datasets.foreach((dataset)=>{
+                data_sum = data_sum + dataset,
+              })
               return value.toString() + "%";
             },
           },
@@ -51,6 +54,8 @@
         animation: false,
         maintainAspectRatio: false,
       };
+ 
+      console.log(data.datasets[data]);
 
       const myChart = new Chart(ctx, {
         type: type,
@@ -58,8 +63,10 @@
         options: options,
         plugins: [ChartDataLabels],
       });
+
       myChart;
     };
-    await languageChart();
+    await contentChart();
   })();
+
 }

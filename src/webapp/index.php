@@ -10,6 +10,7 @@ try {
 }
 
 if ($_POST) {
+  // var_dump($_POST);
   $day = $_POST['day'];
   // 〇年〇月〇日の表記を〇-〇-〇にしたい
   // str_replace( $検索文字列 , $置換後文字列 , $検索対象文字列 [, int &$count ] )
@@ -17,56 +18,37 @@ if ($_POST) {
   $replaceYearMonth = str_replace($target, '-', $day);
   $replaceDate = str_replace('日', '', $replaceYearMonth);
   // strtotime関数で現在日時や指定した日時のUnixタイムスタンプを取得する
-  $newDate = date('Y-m-d', strtotime($day));
-  // $content = filter_input(INPUT_POST, 'content', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY);
-  // $language = filter_input(INPUT_POST, 'language', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY);
-  // $hour = filter_input(INPUT_POST, 'hour', FILTER_DEFAULT, FILTER_VALIDATE_INT);
-  $content = $_POST['content'];
-  $language = $_POST['language'];
-  $hour = $_POST['hour'];
+  $newDate = date('Y-m-d', strtotime($replaceDate));
+  $content = filter_input(INPUT_POST, 'content', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY);
+  
+  $language = filter_input(INPUT_POST, 'language', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY);
+  $hour = filter_input(INPUT_POST, 'hour', FILTER_DEFAULT, FILTER_VALIDATE_INT);
 
   // POSTされたものをstudiesテーブルに追加
-  $sql = 'INSERT INTO studies(day, hour) VALUES (:day, :hour)';
+  $sql = 'INSERT INTO studies(day, hour, language_id, content_id) VALUES (:day, :hour, :language_id, :content_id)';
   $stmt = $pdo->prepare($sql);
   if ($newDate === "") {
-    $stmt->bindValue("day", null, PDO::PARAM_NULL);
+    $stmt->bindValue('day', null, PDO::PARAM_NULL);
   } else {
-    $stmt->bindValue(':studied_date', $newDate);
+    $stmt->bindValue(':day', $newDate);
   }
   if ($hour === "") {
-    $stmt->bindValue(":hour", null, PDO::PARAM_NULL);
+    $stmt->bindValue(':hour', null, PDO::PARAM_NULL);
   } else {
-    $stmt->bindValue(':hour', $hour);
-  }
-  $studies = $stmt->execute();
-
-  // 言語、コンテンツは別で管理したい
-  $studies_id = $pdo->lastInsertId();
-
-  // 言語複数あったらその数で割ったのを学習時間として登録
-  $time_lang = $hour / count($language);
-  $sql = 'INSERT INTO languages(studies_id, language, hour) VALUES (:studies_id, :language, :hour)';
-  $stmt = $pdo->prepare($sql);
-  foreach ($language as $lang) {
-    $stmt->bindValue(':studies_id', $studies_id);
-    $stmt->bindValue(':language', $lang);
-    $stmt->bindValue(':hour', $time_lang);
-    $languages = $stmt->execute();
+    $time_con = $hour / count($content);
+    $time_lang = $time_con / count($language);
+    foreach ($content as $con) {
+      $stmt->bindValue(':content_id', $con);
+      foreach ($language as $lang) {
+        $stmt->bindValue(':language_id', $lang);
+        $stmt->bindValue(':hour', $time_lang);
+        $studies = $stmt->execute();
+      }
+    }
   }
 
-  // コンテンツも同様
-  $time_con = $hour / count($content);
-  $sql = 'INSERT INTO content(studies_id, content, hour) VALUES (:studies_id, :content, :hour)';
-  $stmt = $pdo->prepare($sql);
-  foreach ($content as $con) {
-    $stmt->bindValue(':studies_id', $studies_id);
-    $stmt->bindValue(':content', $con);
-    $stmt->bindValue(':hour', $time_con);
-    $contents = $stmt->execute();
-  }
-
-  // POSTおわったらリダイレクトする
-  header("Location:./index.php");
+  sleep(5);
+  header('/webapp/index.php');
 } else {
   echo "error";
 }
@@ -82,11 +64,12 @@ $month = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $total = $pdo->query("SELECT sum(hour) as hour from studies")->fetchAll(PDO::FETCH_ASSOC);
 
 // 日毎の学習時間
-$sql = "SELECT calendar.ymd as ymd, COALESCE(studies.hour, 0) as 学習時間 FROM (
+$sql = "SELECT calendar.ymd as ymd, sum(COALESCE(studies.hour, 0)) as 学習時間 FROM (
   SELECT DATE_FORMAT(date_add(date_add(last_day(now()), interval - day(last_day(now())) DAY) , INTERVAL td.add_day DAY), '%y-%m-%d') AS ymd FROM (
       SELECT 0 as add_day FROM dual WHERE ( @num:= 1 - 1 ) * 0 union all SELECT @num:= @num + 1 as add_day FROM `information_schema`.columns limit 31
   ) AS td
-) AS calendar LEFT JOIN studies ON calendar.ymd = studies.day WHERE month(calendar.ymd) = month(now()) ORDER BY calendar.ymd";
+) AS calendar LEFT JOIN studies ON calendar.ymd = studies.day WHERE month(calendar.ymd) = month(now()) GROUP BY calendar.ymd ORDER BY calendar.ymd";
+//  
 $hours = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
 // グラフデータ用意
@@ -102,6 +85,38 @@ $formatted_hours_data = array_map(function ($data) {
 $j_hours_data = json_encode($formatted_hours_data);
 file_put_contents("hours.json", $j_hours_data);
 
+// 学習言語
+$sql = "SELECT sum(studies.hour) as 学習時間, languages.language as 学習言語 FROM studies INNER JOIN languages ON studies.language_id = languages.id GROUP BY language_id;";
+$languages = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+
+$formatted_languages_data = array_map(function ($data) {
+  return $data['学習言語'];
+}, $languages);
+$j_languages_data = json_encode($formatted_languages_data);
+file_put_contents("languages.json", $j_languages_data);
+
+$formatted_langhours_data = array_map(function ($data) {
+  return $data['学習時間'];
+}, $languages);
+$j_langhours_data = json_encode($formatted_langhours_data);
+file_put_contents("langhours.json", $j_langhours_data);
+
+// 学習コンテンツ
+$sql = "SELECT sum(studies.hour) as 学習時間, contents.content as 学習コンテンツ FROM studies INNER JOIN contents ON studies.content_id = contents.id GROUP BY content_id;";
+$contents = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+
+$formatted_contents_data = array_map(function ($data) {
+  return $data['学習コンテンツ'];
+}, $contents);
+$j_contents_data = json_encode($formatted_contents_data);
+file_put_contents("contents.json", $j_contents_data);
+
+$formatted_conhours_data = array_map(function ($data) {
+  return $data['学習時間'];
+}, $contents);
+$j_conhours_data = json_encode($formatted_conhours_data);
+file_put_contents("conhours.json", $j_conhours_data);
+
 ?>
 
 <!DOCTYPE html>
@@ -116,12 +131,13 @@ file_put_contents("hours.json", $j_hours_data);
   <link rel="stylesheet" href="./assets/styles/style.css">
   <!-- chartjs読み込み -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0" defer></script>  
   <!-- js読み込み -->
   <script src="./assets/scripts/modal.js" defer></script>
   <script src="./assets/scripts/calendar.js" defer></script>
   <script src="./assets/scripts/barGraph.js" defer></script>
   <script src="./assets/scripts/languageChart.js" defer></script>
-  <script src="./assets/scripts/studyChart.js" defer></script>
+  <script src="./assets/scripts/contentChart.js" defer></script>
 </head>
 
 <body>
@@ -134,60 +150,62 @@ file_put_contents("hours.json", $j_hours_data);
   </header>
   <div class="modal" id="js-modal">
     <div class="modal_container" id="js-modalContainer">
-      <div class="modal_container_inner">
-        <div class="modal_inner_left">
-          <div class="modal_day">
-            <p class="label">学習日</p>
-            <input type="text" id="day" name="day">
-          </div>
-          <div class="modal_content">
-            <p class="label">学習コンテンツ（複数選択可）</p>
-            <div class="checkbox_container">
-              <div class="checkbox"><input type="checkbox" id="content1" name="content"><label for="content1"
-                  class="checkbox_label">N予備校</label></div>
-              <div class="checkbox"><input type="checkbox" id="content2" name="content"><label for="content2"
-                  class="checkbox_label">ドットインストール</label></div>
-              <div class="checkbox"><input type="checkbox" id="content3" name="content"><label for="content3"
-                  class="checkbox_label">POSSE課題</label></div>
+      <form action="" method="post">
+        <div class="modal_container_inner">
+          <div class="modal_inner_left">
+            <div class="modal_day">
+              <p class="label">学習日</p>
+              <input type="text" id="day" name="day">
+            </div>
+            <div class="modal_content">
+              <p class="label">学習コンテンツ（複数選択可）</p>
+              <div class="checkbox_container">
+                <div class="checkbox"><input type="checkbox" id="nyobi" name="content[]" value="1"><label for="nyobi"
+                    class="checkbox_label">N予備校</label></div>
+                <div class="checkbox"><input type="checkbox" id="dotinstall" name="content[]" value="2"><label for="dotinstall"
+                    class="checkbox_label">ドットインストール</label></div>
+                <div class="checkbox"><input type="checkbox" id="posse_kadai" name="content[]" value="3"><label for="posse_kadai"
+                    class="checkbox_label">POSSE課題</label></div>
+              </div>
+            </div>
+            <div class="modal_language">
+              <p class="label">学習言語（複数選択可）</p>
+              <div class="checkbox_container">
+                <div class="checkbox"><input type="checkbox" id="language1" name="language[]" value="1"><label for="language1"
+                    class="checkbox_label">HTNL</label></div>
+                <div class="checkbox"><input type="checkbox" id="language2" name="language[]" value="2"><label for="language2"
+                    class="checkbox_label">CSS</label></div>
+                <div class="checkbox"><input type="checkbox" id="language3" name="language[]" value="3"><label for="language3"
+                    class="checkbox_label">JavaScript</label></div>
+                <div class="checkbox"><input type="checkbox" id="language4" name="language[]" value="4"><label for="language4"
+                    class="checkbox_label">PHP</label></div>
+                <div class="checkbox"><input type="checkbox" id="language5" name="language[]" value="5"><label for="language5"
+                    class="checkbox_label">Laravel</label></div>
+                <div class="checkbox"><input type="checkbox" id="language6" name="language[]" value="6"><label for="language6"
+                    class="checkbox_label">SQL</label></div>
+                <div class="checkbox"><input type="checkbox" id="language7" name="language[]" value="7"><label for="language7"
+                    class="checkbox_label">SHELL</label></div>
+                <div class="checkbox"><input type="checkbox" id="language8" name="language[]" value="8"><label for="language8"
+                    class="checkbox_label">情報システム基礎(その他)</label></div>
+              </div>
             </div>
           </div>
-          <div class="modal_language">
-            <p class="label">学習言語（複数選択可）</p>
-            <div class="checkbox_container">
-              <div class="checkbox"><input type="checkbox" id="language1" name="language"><label for="language1"
-                  class="checkbox_label">HTNL</label></div>
-              <div class="checkbox"><input type="checkbox" id="language2" name="language"><label for="language2"
-                  class="checkbox_label">CSS</label></div>
-              <div class="checkbox"><input type="checkbox" id="language3" name="language"><label for="language3"
-                  class="checkbox_label">JavaScript</label></div>
-              <div class="checkbox"><input type="checkbox" id="language4" name="language"><label for="language4"
-                  class="checkbox_label">PHP</label></div>
-              <div class="checkbox"><input type="checkbox" id="language5" name="language"><label for="language5"
-                  class="checkbox_label">Laravel</label></div>
-              <div class="checkbox"><input type="checkbox" id="language6" name="language"><label for="language6"
-                  class="checkbox_label">SQL</label></div>
-              <div class="checkbox"><input type="checkbox" id="language7" name="language"><label for="language7"
-                  class="checkbox_label">SHELL</label></div>
-              <div class="checkbox"><input type="checkbox" id="language8" name="language"><label for="language8"
-                  class="checkbox_label">情報システム基礎(その他)</label></div>
+          <div class="modal_inner_right">
+            <div class="modal_hour">
+              <p class="label">学習時間</p>
+              <input type="text" id="hour" name="hour">
             </div>
-
+            <div class="modal_twitter">
+              <p class="label">Twitter用コメント</p>
+              <input type="text" id="twitter" name="twitter">
+            </div>
+            <input type="checkbox" id="share_button"><label for="share_button"
+              class="share_button_label">Twiterにシェアする</label>
           </div>
         </div>
-        <div class="modal_inner_right">
-          <div class="modal_hour">
-            <p class="label">学習時間</p>
-            <input type="text" id="hour" name="hour">
-          </div>
-          <div class="modal_twitter">
-            <p class="label">Twitter用コメント</p>
-            <input type="text" id="twitter" name="twitter">
-          </div>
-          <input type="checkbox" id="share_button"><label for="share_button"
-            class="share_button_label">Twiterにシェアする</label>
-        </div>
-      </div>
-      <button id="modalRecordButton" class="modal_record-button">記録・投稿</button>
+        <input type="submit" value="記録・投稿" id="modalRecordButton" class="modal_record-button">
+      </form>
+      <!-- <button id="modalRecordButton" class="modal_record-button">記録・投稿</button> -->
       <button id="js-closeButton" class="modal_close-button">×</button>
     </div>
     <div id="js-calendar" class="calendar">
@@ -326,9 +344,8 @@ file_put_contents("hours.json", $j_hours_data);
   </main>
   <!-- <div class="test">
     <?PHP
-    echo '<pre>';
-    var_dump($formatted_hours_data);
-    var_dump($formatted_days_data);
+    // echo '<pre>';
+    // var_dump($languages);
     ?>
   </div> -->
 

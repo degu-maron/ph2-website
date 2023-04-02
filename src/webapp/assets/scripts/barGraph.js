@@ -1,12 +1,14 @@
 'use strict'
 {
-  // async-awaitにしてみる
   (async function () {
-    const url = '/webapp/hours.json';
+    const url1 = '/webapp/hours.json';
+    const url2 = '/webapp/days.json';
 
     async function hoursGraph() {
-      const response = await fetch(url);
-      const hours = await response.json();
+      const response1 = await fetch(url1);
+      const hours = await response1.json();
+      const response2 = await fetch(url2);
+      const days = await response2.json();
 
       let type = 'bar';
 
@@ -18,8 +20,8 @@
       document.getElementsByClassName
 
       const data = {
-        labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
-        // labels: days,
+        // labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
+        labels: days,
         datasets: [{
           label: '',
           // data: [2.5, 4.3, 1.0, 3.3, 3.3, 4.0, 6.2, 7.3, 1.5, 4.0, 2.0, 5.5, 7.0, 8.0, 5.5, 3.7, 4.3, 0.7, 0.7, 1.0, 4.0, 2.5, 5.5, 1.5, 6.2, 8.0, 8.0, 2.5, 0.7, 4.0, 1.3],
